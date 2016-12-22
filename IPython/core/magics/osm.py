@@ -22,6 +22,7 @@ import os
 import re
 import sys
 from pprint import pformat
+from swiftclient.client import Connection
 
 # Our own packages
 from IPython.core import magic_arguments
@@ -788,3 +789,31 @@ class OSMagics(Magics):
         mode = 'a' if args.append else 'w'
         with io.open(filename, mode, encoding='utf-8') as f:
             f.write(cell)
+
+    @magic_arguments.magic_arguments()
+    @magic_arguments.argument(
+        'container_obj', type=unicode_type,
+        help='container/object path to upload'
+    )
+    @cell_magic
+    def uploadfile(self, line, cell):
+        """Upload fthe contents of the cell to OpenStack Swift.
+        """
+        args = magic_arguments.parse_argstring(self.uploadfile, line)
+        container_obj = os.path.expanduser(args.container_obj)
+        container, obj = container_obj.split('/', 1)
+
+        # host, username, key
+        try:
+            auth_url = os.environ['ST_AUTH']
+            auth_user = os.environ['ST_USER']
+            auth_password = os.environ['ST_KEY']
+        except KeyError:
+            print("You need to set ST_AUTH, ST_USER, ST_KEY for"
+                  "Swift authentication")
+
+        conn = Connection(auth_url, auth_user, auth_password)
+
+        conn.put_object(
+            container, obj, cell,
+            headers={"Content-Type": "application/python"})
